@@ -1,0 +1,9 @@
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
+TWILIO_ACCOUNT_SID = "TWILIO_ACCOUNT_SID"
+TWILIO_AUTH_TOKEN = "TWILIO_AUTH_TOKEN"
+TWILIO_WHATSAPP_NUMBER = "TWILIO_WHATSAPP_NUMBER"  # or your real number
