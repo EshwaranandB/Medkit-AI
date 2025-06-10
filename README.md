@@ -26,7 +26,7 @@ An AI-powered WhatsApp Assistant that offers **instant health information and we
 ### 1. Clone the repo
 
 
-gh repo clone EshwaranandB/Medkit-AI
+https://github.com/EshwaranandB/Medkit-AI.git
 cd Medkit-AI
 pip install -r requirements.txt
 
