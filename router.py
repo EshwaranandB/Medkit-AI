@@ -6,18 +6,21 @@ from twilio.rest import Client
 import re
 
 router = APIRouter()
-conversations = {}
 
+# Twilio client for sending replies
 client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
-# Clean markdown + extra chars
+# Conversation history per user (in-memory)
+conversations = {}
+
+# Cleans markdown, emojis, and invisible chars
 def clean_message(text: str) -> str:
-    text = text.replace("**", "")
-    text = re.sub(r"[^\x20-\x7E\n]+", "", text)
+    text = text.replace("**", "")  # Remove bold
+    text = re.sub(r"[^\x20-\x7E\n]+", "", text)  # Remove non-printable chars
     return text.strip()
 
-# Split messages safely into WhatsApp-safe chunks
-def split_response(text: str, max_len: int = 1000, max_parts: int = 3) -> list:
+# Splits long messages into parts safe for WhatsApp (max ~1000 chars)
+def split_response(text: str, max_len: int = 1000, max_parts: int = 4) -> list:
     parts = []
     while len(text) > max_len and len(parts) < max_parts:
         idx = text.rfind("\n", 0, max_len)
@@ -28,60 +31,68 @@ def split_response(text: str, max_len: int = 1000, max_parts: int = 3) -> list:
         parts.append(text.strip())
     return parts
 
+# MAIN TWILIO ENDPOINT
 @router.post("/webhook")
 async def whatsapp_webhook(request: Request):
-    data = await request.form()
-    user_msg = data.get("Body", "") or "Hello"
-    sender = data.get("From", "")
-    print(f"{sender} says: {user_msg}")
+    try:
+        data = await request.form()
+        user_msg = data.get("Body", "") or "Hello"
+        sender = data.get("From", "")
 
-    if sender not in conversations:
-        conversations[sender] = []
+        print(f"{sender} says: {user_msg}")
 
-    conversations[sender].append({"role": "user", "content": user_msg})
-    history = conversations[sender][-6:]
-    system_prompt = {
-        "role": "system",
-        "content": "You are a polite, professional AI health assistant named Medkit. Always reply in English. Stay within medical, wellness, and mental health topics only."
-    }
-    messages = [system_prompt] + history
+        # Maintain user message history
+        if sender not in conversations:
+            conversations[sender] = []
+        conversations[sender].append({"role": "user", "content": user_msg})
+        history = conversations[sender][-6:]
 
-    ai_response = await query_deepseek(messages)
-    print(f"AI response: {ai_response}")
-    conversations[sender].append({"role": "assistant", "content": ai_response})
+        # Compose full prompt
+        messages = [{"role": "system", "content": (
+            "You are Medkit, a professional AI health assistant. Only respond to health, wellness, or mental health queries. Always reply in English, politely and helpfully."
+        )}] + history
 
-    # Send multiple messages using Twilio client
-    cleaned = clean_message(ai_response)
-    parts = split_response(cleaned)
+        # Query LLM
+        ai_response = await query_deepseek(messages)
+        print(f"AI response: {ai_response}")
+        conversations[sender].append({"role": "assistant", "content": ai_response})
 
-    for part in parts:
-        if part.strip():
-            client.messages.create(
-                from_=TWILIO_WHATSAPP_NUMBER,
-                to=sender,
-                body=part
-            )
+        # Clean + split for WhatsApp
+        cleaned = clean_message(ai_response)
+        parts = split_response(cleaned)
 
-    return PlainTextResponse("OK")
+        for part in parts:
+            if part.strip():
+                client.messages.create(
+                    from_=TWILIO_WHATSAPP_NUMBER,
+                    to=sender,
+                    body=part
+                )
 
+        return PlainTextResponse("✅ Reply sent to WhatsApp")
+
+    except Exception as e:
+        print("❌ Webhook Error:", str(e))
+        return PlainTextResponse("Something went wrong.", status_code=500)
+
+# HEALTH CHECK
 @router.get("/")
 async def home():
-    return {"status": "HealthBot REST backend running"}
+    return {"status": "Medkit AI is running on Railway!"}
 
+# API TESTING (for curl/Postman)
 @router.post("/test-api")
 async def test_api(request: Request):
     data = await request.json()
     user_msg = data.get("message", "")
     sender = "test_user"
+
     if sender not in conversations:
         conversations[sender] = []
     conversations[sender].append({"role": "user", "content": user_msg})
     history = conversations[sender][-6:]
-    system_prompt = {
-        "role": "system",
-        "content": "You are a helpful health assistant named Medkit. Stay on-topic and respond kindly."
-    }
-    messages = [system_prompt] + history
+    messages = [{"role": "system", "content": "You're Medkit. Help users with their health questions in English."}] + history
+
     ai_response = await query_deepseek(messages)
     conversations[sender].append({"role": "assistant", "content": ai_response})
     return JSONResponse(content={"reply": ai_response})
