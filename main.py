@@ -13,3 +13,10 @@ app.add_middleware(
 
 # Register all routes from router.py
 app.include_router(router)
+
+# At bottom of main.py
+if __name__ == "__main__":
+    import uvicorn, os
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
+
