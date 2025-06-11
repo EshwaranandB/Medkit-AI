@@ -1,4 +1,5 @@
-# Medkit-AI
+# Medkit-AI  ![WhatsApp Image 2025-06-11 at 12 27 15_818af003](https://github.com/user-attachments/assets/76ef8557-4c39-467e-8a4c-1d325d2712bb)
+
 
 An AI-powered WhatsApp Assistant that offers **instant health information and wellness guidance**. Built with **FastAPI**, **Twilio**, and **DeepSeek V3**, this assistant provides 24/7 support to users—directly in their WhatsApp chat.
 
